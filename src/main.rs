@@ -17,12 +17,31 @@ impl Shape {
     fn draw(&self, painter: &Painter) {
         match self {
             Shape::Stroke(stroke) => {
+                if let Some(point) = stroke.points.first() {
+                    painter.add(egui::Shape::circle_filled(
+                        *point,
+                        stroke.size / 2.0,
+                        stroke.colour,
+                    ));
+                }
                 painter.add(egui::Shape::line(
                     stroke.points.clone(),
                     egui::Stroke::new(stroke.size, stroke.colour),
                 ));
+                if let Some(point) = stroke.points.last() {
+                    painter.add(egui::Shape::circle_filled(
+                        *point,
+                        stroke.size / 2.0,
+                        stroke.colour,
+                    ));
+                }
             }
             Shape::Arrow(arrow) => {
+                painter.add(egui::Shape::circle_filled(
+                    arrow.start,
+                    arrow.size / 2.0,
+                    arrow.colour,
+                ));
                 painter.add(egui::Shape::line(
                     vec![arrow.start, arrow.end],
                     egui::Stroke::new(arrow.size, arrow.colour),
@@ -52,11 +71,26 @@ impl Shape {
                         egui::Stroke::new(arrow.size, arrow.colour),
                     ));
                 }
+                painter.add(egui::Shape::circle_filled(
+                    arrow.end,
+                    arrow.size / 2.0,
+                    arrow.colour,
+                ));
             }
             Shape::Line(line) => {
+                painter.add(egui::Shape::circle_filled(
+                    line.start,
+                    line.size / 2.0,
+                    line.colour,
+                ));
                 painter.add(egui::Shape::line(
                     vec![line.start, line.end],
                     egui::Stroke::new(line.size, line.colour),
+                ));
+                painter.add(egui::Shape::circle_filled(
+                    line.end,
+                    line.size / 2.0,
+                    line.colour,
                 ));
             }
         }
