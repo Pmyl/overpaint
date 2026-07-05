@@ -1,10 +1,16 @@
+mod colour_wheel_ui;
+
 use eframe::egui::{self, Color32, Painter, Pos2, ViewportBuilder};
+
+use crate::colour_wheel_ui::ColourWheelUi;
 
 struct SketchApp {
     shapes: Vec<Shape>,
     current_shape: Option<Shape>,
     colour_wheel: ColourWheel,
     brush: Brush,
+
+    colour_wheel_ui: ColourWheelUi,
 }
 
 enum Shape {
@@ -132,6 +138,7 @@ impl Default for SketchApp {
             current_shape: None,
             colour_wheel: ColourWheel::default(),
             brush: Brush::default(),
+            colour_wheel_ui: ColourWheelUi::default(),
         }
     }
 }
@@ -225,13 +232,6 @@ impl eframe::App for SketchApp {
                 let alt = ui.input(|i| i.modifiers.alt);
                 let scroll = ui.input(|i| i.raw_scroll_delta.x + i.raw_scroll_delta.y);
 
-                painter.circle(
-                    screen_rect.left_bottom(),
-                    100.0,
-                    self.colour_wheel.current,
-                    egui::Stroke::NONE,
-                );
-
                 for shape in &self.shapes {
                     shape.draw(&painter);
                 }
@@ -246,6 +246,19 @@ impl eframe::App for SketchApp {
                         egui::Stroke::NONE,
                     );
                 }
+
+                painter.circle(
+                    screen_rect.left_bottom(),
+                    100.0,
+                    self.colour_wheel.current,
+                    egui::Stroke::NONE,
+                );
+
+                self.colour_wheel_ui.draw(
+                    painter,
+                    Pos2::new(0.0, screen_rect.height()),
+                    &self.colour_wheel,
+                );
 
                 match (ctrl, scroll) {
                     (false, scroll) if scroll > 0.0 => self.colour_wheel.next(),
