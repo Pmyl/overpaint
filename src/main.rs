@@ -1,4 +1,4 @@
-use eframe::egui::{self, Color32, Painter, Pos2, Rect, ViewportBuilder};
+use eframe::egui::{self, Color32, Painter, Pos2, ViewportBuilder};
 
 struct SketchApp {
     shapes: Vec<Shape>,
@@ -214,6 +214,8 @@ impl eframe::App for SketchApp {
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        ctx.set_cursor_icon(egui::CursorIcon::None);
+
         egui::CentralPanel::default()
             .frame(egui::Frame::NONE)
             .show(ctx, |ui| {
@@ -223,19 +225,9 @@ impl eframe::App for SketchApp {
                 let alt = ui.input(|i| i.modifiers.alt);
                 let scroll = ui.input(|i| i.raw_scroll_delta.x + i.raw_scroll_delta.y);
 
-                painter.rect(
-                    Rect::from_two_pos(
-                        screen_rect.left_bottom(),
-                        (screen_rect.left_bottom() - Pos2::new(-40., 40.)).to_pos2(),
-                    ),
-                    0.0,
-                    Color32::from_rgb(50, 50, 50),
-                    egui::Stroke::NONE,
-                    egui::StrokeKind::Inside,
-                );
                 painter.circle(
-                    (screen_rect.left_bottom() - Pos2::new(-20., 20.)).to_pos2(),
-                    self.brush.size,
+                    screen_rect.left_bottom(),
+                    100.0,
                     self.colour_wheel.current,
                     egui::Stroke::NONE,
                 );
@@ -246,6 +238,13 @@ impl eframe::App for SketchApp {
 
                 if let Some(current_shape) = &self.current_shape {
                     current_shape.draw(&painter);
+                } else if let Some(pos) = ui.input(|i| i.pointer.latest_pos()) {
+                    painter.circle(
+                        pos,
+                        self.brush.size / 2.0,
+                        self.colour_wheel.current,
+                        egui::Stroke::NONE,
+                    );
                 }
 
                 match (ctrl, scroll) {
