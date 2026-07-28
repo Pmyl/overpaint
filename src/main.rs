@@ -1,9 +1,7 @@
 mod colour_wheel_ui;
 
 use crate::colour_wheel_ui::ColourWheelUi;
-use eframe::egui::{
-    self, Color32, CornerRadius, FontId, Painter, Pos2, Rect, Vec2, ViewportBuilder,
-};
+use eframe::egui::{self, Color32, CornerRadius, FontId, Painter, Pos2, Rect, ViewportBuilder};
 
 struct SketchApp {
     shapes: Vec<Shape>,
