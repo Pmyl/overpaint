@@ -1,16 +1,21 @@
 use eframe::egui::{
-    CentralPanel, Color32, CursorIcon, Event, Frame, Key, Pos2, Rect, Stroke as EguiStroke, Ui,
-    ViewportCommand, Visuals,
+    Align2, CentralPanel, Color32, CursorIcon, Event, FontId, Frame, Key, Pos2, Rect,
+    Stroke as EguiStroke, Ui, ViewportCommand, Visuals,
 };
 
 use crate::{
     brush::Brush,
     colour_wheel::{ColourWheel, ColourWheelUi},
+    debug::draw_bounding_rect,
+    history::HistoryEvent,
     shapes::{Shape, arrow::Arrow, line::Line, stroke::Stroke, text::Text},
 };
 
 mod brush;
 mod colour_wheel;
+mod debug;
+mod geometry;
+mod history;
 mod shapes;
 
 pub struct OverpaintApp {
@@ -20,6 +25,10 @@ pub struct OverpaintApp {
     brush: Brush,
 
     colour_wheel_ui: ColourWheelUi,
+
+    history: Vec<HistoryEvent>,
+    debug_mode: bool,
+    previous_mouse_position: Pos2,
 }
 
 impl Default for OverpaintApp {
@@ -30,6 +39,10 @@ impl Default for OverpaintApp {
             colour_wheel: ColourWheel::default(),
             brush: Brush::default(),
             colour_wheel_ui: ColourWheelUi::default(),
+
+            history: Vec::new(),
+            debug_mode: false,
+            previous_mouse_position: Pos2::ZERO,
         }
     }
 }
@@ -51,19 +64,21 @@ impl eframe::App for OverpaintApp {
                 escape,
                 undo,
                 scroll,
+                f1,
                 mouse_position,
                 text_events,
                 has_text_events,
                 mouse_primary_pressed,
                 mouse_primary_released,
+                mouse_secondary_held,
             } = extract_interactions_info(ui);
 
             for shape in &self.shapes {
-                shape.draw(&painter);
+                shape.draw(painter);
             }
 
             if let Some(current_shape) = &self.current_shape {
-                current_shape.draw(&painter);
+                current_shape.draw(painter);
             } else {
                 painter.circle(
                     mouse_position,
@@ -71,6 +86,38 @@ impl eframe::App for OverpaintApp {
                     self.colour_wheel.current,
                     EguiStroke::NONE,
                 );
+            }
+
+            if f1 {
+                self.debug_mode = !self.debug_mode;
+            }
+
+            if self.debug_mode {
+                painter.text(
+                    Pos2::ZERO,
+                    Align2::LEFT_TOP,
+                    "DEBUG MODE: ON",
+                    FontId::default(),
+                    Color32::RED,
+                );
+
+                for shape in &self.shapes {
+                    draw_bounding_rect(
+                        painter,
+                        shape,
+                        self.previous_mouse_position,
+                        mouse_position,
+                    );
+                }
+
+                if let Some(current_shape) = &self.current_shape {
+                    draw_bounding_rect(
+                        painter,
+                        current_shape,
+                        self.previous_mouse_position,
+                        mouse_position,
+                    );
+                }
             }
 
             self.colour_wheel_ui.draw(
@@ -89,8 +136,21 @@ impl eframe::App for OverpaintApp {
                 }
             }
 
+            if mouse_secondary_held {
+                self.handle_eraser(
+                    self.brush.size,
+                    self.previous_mouse_position,
+                    mouse_position,
+                );
+            }
+
             if let Some(current_shape) = self.current_shape.as_mut() {
-                current_shape.update(mouse_position, self.brush.size, self.colour_wheel.current);
+                current_shape.update(
+                    mouse_position,
+                    self.brush.size,
+                    self.colour_wheel.current,
+                    painter,
+                );
 
                 match current_shape {
                     Shape::Text(text_shape) if mouse_primary_pressed => {
@@ -101,14 +161,16 @@ impl eframe::App for OverpaintApp {
                             apply_text_events(&text_events, text_shape.text.clone(), &ctrl);
 
                         if !new_text.is_empty() {
-                            text_shape.text = new_text;
+                            text_shape.set_text(new_text);
                         } else {
                             self.current_shape.take();
                         }
                     }
                     _ => {
                         if mouse_primary_released {
-                            self.shapes.push(self.current_shape.take().unwrap())
+                            let shape = self.current_shape.take().unwrap();
+                            self.shapes.push(shape.clone());
+                            self.history.push(HistoryEvent::Add);
                         }
                     }
                 }
@@ -143,6 +205,7 @@ impl eframe::App for OverpaintApp {
                             mouse_position,
                             self.colour_wheel.current,
                             self.brush.size,
+                            painter,
                         )));
                     }
                 }
@@ -153,9 +216,38 @@ impl eframe::App for OverpaintApp {
             }
 
             if undo {
-                self.shapes.pop();
+                match self.history.pop() {
+                    Some(HistoryEvent::Add) | None => {
+                        self.shapes.pop();
+                    }
+                    Some(HistoryEvent::Remove(shape)) => {
+                        self.shapes.push(shape);
+                    }
+                }
             }
+
+            self.previous_mouse_position = mouse_position;
         });
+    }
+}
+
+impl OverpaintApp {
+    fn handle_eraser(
+        &mut self,
+        thickness: f32,
+        previous_mouse_position: Pos2,
+        mouse_position: Pos2,
+    ) {
+        let mut removed_shapes: Vec<_> = self
+            .shapes
+            .extract_if(.., |shape| {
+                shape.in_bounding_rect(thickness, previous_mouse_position, mouse_position)
+                    && shape.touches(thickness, previous_mouse_position, mouse_position)
+            })
+            .map(|shape| HistoryEvent::Remove(shape))
+            .collect();
+
+        self.history.append(&mut removed_shapes);
     }
 }
 
@@ -166,6 +258,7 @@ fn extract_interactions_info(ui: &Ui) -> InteractionsInfo {
         let alt = i.modifiers.alt;
         let escape = i.key_pressed(Key::Escape);
         let undo = ctrl && i.key_pressed(Key::Z);
+        let f1 = i.key_pressed(Key::F1);
         let scroll = i
             .events
             .iter()
@@ -194,6 +287,7 @@ fn extract_interactions_info(ui: &Ui) -> InteractionsInfo {
         let has_text_events = !text_events.is_empty();
         let mouse_primary_pressed = i.pointer.primary_pressed();
         let mouse_primary_released = i.pointer.primary_released();
+        let mouse_secondary_held = i.pointer.secondary_down();
 
         InteractionsInfo {
             screen_rect,
@@ -201,12 +295,14 @@ fn extract_interactions_info(ui: &Ui) -> InteractionsInfo {
             alt,
             escape,
             undo,
+            f1,
             scroll,
             mouse_position,
             text_events,
             has_text_events,
             mouse_primary_pressed,
             mouse_primary_released,
+            mouse_secondary_held,
         }
     })
 }
@@ -241,10 +337,12 @@ pub struct InteractionsInfo {
     alt: bool,
     escape: bool,
     undo: bool,
+    f1: bool,
     scroll: f32,
     mouse_position: Pos2,
     text_events: Vec<Event>,
     has_text_events: bool,
     mouse_primary_pressed: bool,
     mouse_primary_released: bool,
+    mouse_secondary_held: bool,
 }

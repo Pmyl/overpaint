@@ -1,0 +1,35 @@
+// Project-local debug tasks
+//
+// For more documentation on how to configure debug tasks,
+// see: https://zed.dev/docs/debugger
+[
+  {
+    "adapter": "CodeLLDB",
+    "label": "cargo build -p overpaint --all-targets",
+    "build": {
+      "label": "cargo build -p overpaint --all-targets",
+      "command": "cargo",
+      "args": [
+        "build"
+      ],
+      "env": {
+        "RUSTC_TOOLCHAIN": "/home/pmyl/.rustup/toolchains/stable-x86_64-unknown-linux-gnu"
+      },
+      "cwd": "/media/pmyl/Tardis/Projects/Overpaint",
+      "use_new_terminal": false,
+      "allow_concurrent_runs": false,
+      "reveal": "always",
+      "reveal_target": "dock",
+      "hide": "never",
+      "tags": [],
+      "shell": "system",
+      "show_summary": false,
+      "show_command": false,
+      "save": "none",
+      "hooks": []
+    },
+    "sourceLanguages": [
+      "rust"
+    ]
+  }
+]

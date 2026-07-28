@@ -1,53 +1,112 @@
-use eframe::egui::{Color32, CornerRadius, FontId, Painter, Pos2, Rect, Shape, vec2};
+use std::sync::Arc;
 
+use eframe::egui::{Color32, CornerRadius, FontId, Galley, Painter, Pos2, Rect, Shape, vec2};
+
+use crate::geometry::line_hits_rect;
+
+#[derive(Clone)]
 pub struct Text {
     pub pos: Pos2,
     pub colour: Color32,
     pub bg_colour: Color32,
     pub size: f32,
     pub text: String,
+
+    pub font_size: f32,
+    pub galley: Arc<Galley>,
+    pub galley_invalidated: bool,
+    pub bounding_rect: Rect,
+}
+
+const RECT_PADDING: f32 = 5.0;
+
+fn font_size(size: f32) -> f32 {
+    8.0 + size * 1.5
+}
+
+fn galley(painter: &Painter, font_size: f32, text: &str, colour: Color32) -> Arc<Galley> {
+    painter
+        .fonts_mut(|f| f.layout_no_wrap(text.to_string(), FontId::proportional(font_size), colour))
+}
+
+fn rect(pos: Pos2, galley: &Galley) -> Rect {
+    let text_height = galley.size().y;
+    let text_width = galley.size().x;
+
+    Rect {
+        min: pos - vec2(RECT_PADDING, RECT_PADDING),
+        max: Pos2::new(
+            pos.x + text_width + RECT_PADDING,
+            pos.y + text_height + RECT_PADDING,
+        ),
+    }
 }
 
 impl Text {
-    pub fn new(text: String, pos: Pos2, bg_colour: Color32, size: f32) -> Self {
+    pub fn new(text: String, pos: Pos2, bg_colour: Color32, size: f32, painter: &Painter) -> Self {
+        let font_size = font_size(size);
+        let colour = colour_on_bg(bg_colour);
+        let galley = galley(painter, font_size, &text, colour);
+        let bounding_rect = rect(pos, &galley);
+
         Self {
             pos,
-            colour: colour_on_bg(bg_colour),
+            colour,
             bg_colour,
             size,
             text,
+            font_size,
+            galley,
+            galley_invalidated: false,
+            bounding_rect,
         }
     }
 
-    pub fn update(&mut self, pos: Pos2, size: f32, colour: Color32) {
+    pub fn update(&mut self, pos: Pos2, size: f32, colour: Color32, painter: &Painter) {
+        let galley_invalidated = self.galley_invalidated
+            || self.bg_colour != colour
+            || self.pos != pos
+            || self.size != size;
+        self.galley_invalidated = false;
         self.pos = pos;
-        self.size = size;
+
         if self.bg_colour != colour {
             self.bg_colour = colour;
             self.colour = colour_on_bg(colour);
         }
+
+        if self.size != size {
+            self.size = size;
+            self.font_size = font_size(self.size);
+        }
+
+        if galley_invalidated {
+            self.galley = galley(painter, self.font_size, &self.text, self.colour);
+            self.bounding_rect = rect(pos, &self.galley);
+        }
     }
 
     pub fn draw(&self, painter: &Painter) {
-        let font_size = 8.0 + self.size * 1.5;
-        let font_id = FontId::proportional(font_size);
-        let rect_padding = 10.0;
-        let rect_height = font_size + rect_padding;
-
-        let galley =
-            painter.fonts_mut(|f| f.layout_no_wrap(self.text.clone(), font_id, self.colour));
-        let font_width = galley.size().x;
-
         painter.add(Shape::rect_filled(
-            Rect::from_min_size(
-                self.pos - vec2(rect_padding, 3.0),
-                vec2(font_width + rect_padding * 2.0, rect_height),
-            ),
-            CornerRadius::same((rect_height / 5.0) as u8),
+            self.bounding_rect,
+            CornerRadius::same((self.bounding_rect.height() / 5.0) as u8),
             self.bg_colour,
         ));
 
-        painter.galley(self.pos, galley, self.colour);
+        painter.galley(self.pos, self.galley.clone(), self.colour);
+    }
+
+    pub fn touches(&self, thickness: f32, start: Pos2, end: Pos2) -> bool {
+        line_hits_rect(start, end, thickness, self.bounding_rect())
+    }
+
+    pub fn bounding_rect(&self) -> Rect {
+        self.bounding_rect
+    }
+
+    pub fn set_text(&mut self, new_text: String) {
+        self.text = new_text;
+        self.galley_invalidated = true;
     }
 }
 

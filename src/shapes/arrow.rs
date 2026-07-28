@@ -1,5 +1,8 @@
-use eframe::egui::{Color32, Painter, Pos2, Shape, Stroke, Vec2};
+use eframe::egui::{Color32, Painter, Pos2, Rect, Shape, Stroke, Vec2};
 
+use crate::geometry::lines_intersect;
+
+#[derive(Clone)]
 pub struct Arrow {
     pub start: Pos2,
     pub end: Pos2,
@@ -48,5 +51,16 @@ impl Arrow {
         self.end = pos;
         self.size = size;
         self.colour = colour;
+    }
+
+    pub fn touches(&self, thickness: f32, start: Pos2, end: Pos2) -> bool {
+        lines_intersect(start, end, thickness, self.start, self.end, self.size)
+    }
+
+    pub fn bounding_rect(&self) -> Rect {
+        Rect {
+            min: Pos2::new(self.start.x.min(self.end.x), self.start.y.min(self.end.y)),
+            max: Pos2::new(self.start.x.max(self.end.x), self.start.y.max(self.end.y)),
+        }
     }
 }
