@@ -1,6 +1,56 @@
-use eframe::egui::{Painter, Pos2, Rect, Vec2};
+use eframe::egui::{Color32, Painter, Pos2, Rect, Vec2};
 
-use crate::ColourWheel;
+pub struct ColourWheel {
+    pub current: Color32,
+    pub index: usize,
+    pub wheel: Vec<Color32>,
+}
+
+impl ColourWheel {
+    pub fn next(&mut self) {
+        self.index = (self.index + 1) % self.wheel.len();
+        self.current = self.wheel[self.index];
+    }
+
+    pub fn prev(&mut self) {
+        self.index = if self.index == 0 {
+            self.wheel.len() - 1
+        } else {
+            self.index - 1
+        };
+        self.current = self.wheel[self.index];
+    }
+}
+
+impl Default for ColourWheel {
+    fn default() -> Self {
+        let index = 0;
+        let wheel = vec![
+            Color32::LIGHT_BLUE,
+            Color32::BLUE,
+            Color32::DARK_BLUE,
+            Color32::PURPLE,
+            Color32::DARK_RED,
+            Color32::RED,
+            Color32::LIGHT_RED,
+            Color32::ORANGE,
+            Color32::YELLOW,
+            Color32::LIGHT_GREEN,
+            Color32::GREEN,
+            Color32::DARK_GREEN,
+            Color32::WHITE,
+            Color32::LIGHT_GRAY,
+            Color32::GRAY,
+            Color32::DARK_GRAY,
+            Color32::BLACK,
+        ];
+        Self {
+            current: wheel[index],
+            wheel,
+            index,
+        }
+    }
+}
 
 #[derive(Default)]
 pub struct ColourWheelUi {}
