@@ -105,17 +105,8 @@ impl Shape {
                 let rect_padding = 10.0;
                 let rect_height = font_size + rect_padding;
 
-                let luminance = 0.299 * text.bg_colour.r() as f32
-                    + 0.587 * text.bg_colour.g() as f32
-                    + 0.114 * text.bg_colour.b() as f32;
-                let text_colour = if luminance > 0.5 {
-                    Color32::BLACK
-                } else {
-                    Color32::WHITE
-                };
-
                 let galley = painter
-                    .fonts_mut(|f| f.layout_no_wrap(text.text.clone(), font_id, text_colour));
+                    .fonts_mut(|f| f.layout_no_wrap(text.text.clone(), font_id, text.colour));
                 let font_width = galley.size().x;
 
                 painter.add(egui::Shape::rect_filled(
@@ -127,7 +118,7 @@ impl Shape {
                     text.bg_colour,
                 ));
 
-                painter.galley(text.pos, galley, text_colour);
+                painter.galley(text.pos, galley, text.colour);
             }
         }
     }
@@ -152,7 +143,10 @@ impl Shape {
             Shape::Text(text) => {
                 text.pos = pos;
                 text.size = size;
-                text.bg_colour = colour;
+                if text.bg_colour != colour {
+                    text.bg_colour = colour;
+                    text.colour = Text::colour_on_bg(colour);
+                }
             }
         }
     }
@@ -180,9 +174,33 @@ struct Line {
 
 struct Text {
     pos: Pos2,
+    colour: Color32,
     bg_colour: Color32,
     size: f32,
     text: String,
+}
+
+impl Text {
+    fn new(text: String, pos: Pos2, bg_colour: Color32, size: f32) -> Self {
+        Self {
+            pos,
+            colour: Text::colour_on_bg(bg_colour),
+            bg_colour,
+            size,
+            text,
+        }
+    }
+
+    fn colour_on_bg(bg_colour: Color32) -> Color32 {
+        let luminance = 0.299 * bg_colour.r() as f32
+            + 0.587 * bg_colour.g() as f32
+            + 0.114 * bg_colour.b() as f32;
+        if luminance > 0.5 {
+            Color32::BLACK
+        } else {
+            Color32::WHITE
+        }
+    }
 }
 
 impl Default for SketchApp {
@@ -360,17 +378,22 @@ impl eframe::App for SketchApp {
                 let apply_text_events =
                     |text_events: &[egui::Event], mut current_text: String| -> String {
                         for text_event in text_events {
-                            if let egui::Event::Text(text) = text_event {
-                                current_text.push_str(&text);
-                            } else if matches!(
-                                text_event,
+                            match text_event {
+                                egui::Event::Text(text) => {
+                                    current_text.push_str(&text);
+                                }
                                 egui::Event::Key {
                                     key: egui::Key::Backspace,
                                     pressed: true,
                                     ..
+                                } => {
+                                    if ctrl {
+                                        current_text.clear();
+                                    } else {
+                                        current_text.pop();
+                                    }
                                 }
-                            ) {
-                                current_text.pop();
+                                _ => (),
                             }
                         }
 
@@ -421,12 +444,14 @@ impl eframe::App for SketchApp {
                     }
                     None if has_text_events => {
                         let new_text = apply_text_events(&text_events, String::new());
-                        self.current_shape = Some(Shape::Text(Text {
-                            text: new_text,
-                            pos: mouse_position,
-                            bg_colour: self.colour_wheel.current,
-                            size: self.brush.size,
-                        }));
+                        if !new_text.is_empty() {
+                            self.current_shape = Some(Shape::Text(Text::new(
+                                new_text,
+                                mouse_position,
+                                self.colour_wheel.current,
+                                self.brush.size,
+                            )));
+                        }
                     }
                     _ => {}
                 };
