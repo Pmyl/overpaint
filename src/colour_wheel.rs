@@ -1,4 +1,4 @@
-use eframe::egui::{Color32, Painter, Pos2, Rect, Vec2};
+use eframe::egui::{Color32, Painter, Pos2, Rect, Stroke, Vec2};
 
 pub struct ColourWheel {
     pub current: Color32,
@@ -61,6 +61,8 @@ impl ColourWheelUi {
         let length = colour_wheel.wheel.len();
         let height = pos.y;
         let colour_size = Vec2::splat(10.0);
+
+        painter.circle(pos, 100.0, colour_wheel.current, Stroke::NONE);
 
         for (pos_i, colour_i) in (0..length)
             .map(|offset| (index + offset) % length)
