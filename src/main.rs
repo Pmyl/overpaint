@@ -116,8 +116,8 @@ impl Shape {
                     Color32::WHITE
                 };
 
-                let galley =
-                    painter.fonts(|f| f.layout_no_wrap(text.text.clone(), font_id, text_colour));
+                let galley = painter
+                    .fonts_mut(|f| f.layout_no_wrap(text.text.clone(), font_id, text_colour));
                 let font_width = galley.size().x;
 
                 painter.add(egui::Shape::rect_filled(
@@ -257,11 +257,11 @@ struct Brush {
 
 impl Brush {
     fn enlarge(&mut self) {
-        self.size += 1.0;
+        self.size += 1.5;
     }
 
     fn shrink(&mut self) {
-        self.size = (self.size - 1.0).max(1.0);
+        self.size = (self.size - 1.5).max(1.0);
     }
 }
 
@@ -276,19 +276,27 @@ impl eframe::App for SketchApp {
         Color32::from_rgba_unmultiplied(12, 12, 12, 10).to_normalized_gamma_f32()
     }
 
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        ctx.set_cursor_icon(egui::CursorIcon::None);
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        ui.set_cursor_icon(egui::CursorIcon::None);
 
         egui::CentralPanel::default()
             .frame(egui::Frame::NONE)
-            .show(ctx, |ui| {
+            .show(ui, |ui| {
                 let painter = ui.painter();
-                let screen_rect = ctx.input(|i| i.screen_rect);
+                let screen_rect = ui.input(|i| i.content_rect());
                 let ctrl = ui.input(|i| i.modifiers.ctrl);
                 let alt = ui.input(|i| i.modifiers.alt);
-                let scroll = ui.input(|i| i.raw_scroll_delta.x + i.raw_scroll_delta.y);
+                let scroll = ui.input(|i| {
+                    i.events
+                        .iter()
+                        .filter_map(|e| match e {
+                            egui::Event::MouseWheel { delta, .. } => Some(delta.x + delta.y),
+                            _ => None,
+                        })
+                        .sum::<f32>()
+                });
                 let mouse_position = ui.input(|i| i.pointer.hover_pos()).unwrap_or(Pos2::ZERO);
-                let text_events = ctx.input(|i| {
+                let text_events = ui.input(|i| {
                     i.events
                         .iter()
                         .filter(|e| {
@@ -426,7 +434,7 @@ impl eframe::App for SketchApp {
                 };
 
                 if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
-                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                    ui.send_viewport_cmd(egui::ViewportCommand::Close);
                 }
 
                 if ctrl && ui.input(|i| i.key_pressed(egui::Key::Z)) {
