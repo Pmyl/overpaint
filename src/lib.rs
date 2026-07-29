@@ -163,9 +163,10 @@ impl eframe::App for OverpaintApp {
             match current_shape {
                 Shape::Text(text_shape) if mouse_primary_pressed => {
                     self.shapes.push(self.current_shape.take().unwrap());
+                    self.history.push(HistoryEvent::Add);
                 }
                 Shape::Text(text_shape) if has_text_events => {
-                    let new_text = apply_text_events(&text_events, text_shape.text.clone(), &ctrl);
+                    let new_text = apply_text_events(&text_events, text_shape.text.clone(), ctrl);
 
                     if !new_text.is_empty() {
                         text_shape.set_text(new_text);
@@ -175,8 +176,7 @@ impl eframe::App for OverpaintApp {
                 }
                 _ => {
                     if mouse_primary_released {
-                        let shape = self.current_shape.take().unwrap();
-                        self.shapes.push(shape.clone());
+                        self.shapes.push(self.current_shape.take().unwrap());
                         self.history.push(HistoryEvent::Add);
                     }
                 }
@@ -205,7 +205,7 @@ impl eframe::App for OverpaintApp {
                     }))
                 }
             } else if has_text_events {
-                let new_text = apply_text_events(&text_events, String::new(), &ctrl);
+                let new_text = apply_text_events(&text_events, String::new(), ctrl);
                 if !new_text.is_empty() {
                     self.current_shape = Some(Shape::Text(Text::new(
                         new_text,
@@ -242,7 +242,7 @@ impl OverpaintApp {
         previous_mouse_position: Pos2,
         mouse_position: Pos2,
     ) {
-        let mut removed_shapes: Vec<_> = self
+        let mut removed_shapes_events: Vec<HistoryEvent> = self
             .shapes
             .extract_if(.., |shape| {
                 shape.in_bounding_rect(thickness, previous_mouse_position, mouse_position)
@@ -251,7 +251,7 @@ impl OverpaintApp {
             .map(|shape| HistoryEvent::Remove(shape))
             .collect();
 
-        self.history.append(&mut removed_shapes);
+        self.history.append(&mut removed_shapes_events);
     }
 }
 
@@ -309,7 +309,7 @@ fn extract_interactions_info(ctx: &Context) -> InteractionsInfo {
     })
 }
 
-fn apply_text_events(text_events: &[Event], mut current_text: String, ctrl: &bool) -> String {
+fn apply_text_events(text_events: &[Event], mut current_text: String, ctrl: bool) -> String {
     for text_event in text_events {
         match text_event {
             Event::Text(text) => {
@@ -320,7 +320,7 @@ fn apply_text_events(text_events: &[Event], mut current_text: String, ctrl: &boo
                 pressed: true,
                 ..
             } => {
-                if *ctrl {
+                if ctrl {
                     current_text.clear();
                 } else {
                     current_text.pop();
