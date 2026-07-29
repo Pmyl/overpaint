@@ -16,6 +16,7 @@ fn main() -> Result<(), eframe::Error> {
 #[cfg(target_os = "macos")]
 fn setup_viewport() -> ViewportBuilder {
     use display_info::DisplayInfo;
+    use eframe::egui::{Pos2, Vec2};
 
     let display = DisplayInfo::from_point(0, 0).expect("no display found");
 
