@@ -1,5 +1,5 @@
 use eframe::egui::{
-    Align2, CentralPanel, Color32, CursorIcon, Event, FontId, Frame, Key, Pos2, Rect,
+    Align2, CentralPanel, Color32, Context, CursorIcon, Event, FontId, Frame, Key, Pos2,
     Stroke as EguiStroke, Ui, ViewportCommand, Visuals,
 };
 
@@ -29,6 +29,7 @@ pub struct OverpaintApp {
     history: Vec<HistoryEvent>,
     debug_mode: bool,
     previous_mouse_position: Pos2,
+    mouse_position: Pos2,
 }
 
 impl Default for OverpaintApp {
@@ -43,6 +44,7 @@ impl Default for OverpaintApp {
             history: Vec::new(),
             debug_mode: false,
             previous_mouse_position: Pos2::ZERO,
+            mouse_position: Pos2::ZERO,
         }
     }
 }
@@ -57,21 +59,6 @@ impl eframe::App for OverpaintApp {
 
         CentralPanel::default().frame(Frame::NONE).show(ui, |ui| {
             let painter = ui.painter();
-            let InteractionsInfo {
-                ctrl,
-                screen_rect,
-                alt,
-                escape,
-                undo,
-                scroll,
-                f1,
-                mouse_position,
-                text_events,
-                has_text_events,
-                mouse_primary_pressed,
-                mouse_primary_released,
-                mouse_secondary_held,
-            } = extract_interactions_info(ui);
 
             for shape in &self.shapes {
                 shape.draw(painter);
@@ -81,15 +68,11 @@ impl eframe::App for OverpaintApp {
                 current_shape.draw(painter);
             } else {
                 painter.circle(
-                    mouse_position,
+                    self.mouse_position,
                     self.brush.size / 2.0,
                     self.colour_wheel.current,
                     EguiStroke::NONE,
                 );
-            }
-
-            if f1 {
-                self.debug_mode = !self.debug_mode;
             }
 
             if self.debug_mode {
@@ -106,7 +89,7 @@ impl eframe::App for OverpaintApp {
                         painter,
                         shape,
                         self.previous_mouse_position,
-                        mouse_position,
+                        self.mouse_position,
                     );
                 }
 
@@ -115,119 +98,140 @@ impl eframe::App for OverpaintApp {
                         painter,
                         current_shape,
                         self.previous_mouse_position,
-                        mouse_position,
+                        self.mouse_position,
                     );
                 }
             }
 
             self.colour_wheel_ui.draw(
                 painter,
-                Pos2::new(0.0, screen_rect.height()),
+                Pos2::new(0.0, ui.input(|ui| ui.content_rect()).height()),
                 &self.colour_wheel,
             );
-
-            if scroll != 0.0 {
-                match ctrl {
-                    false if scroll > 0.0 => self.colour_wheel.next(),
-                    false if scroll < 0.0 => self.colour_wheel.prev(),
-                    true if scroll > 0.0 => self.brush.enlarge(),
-                    true if scroll < 0.0 => self.brush.shrink(),
-                    _ => {}
-                }
-            }
-
-            if mouse_secondary_held {
-                self.handle_eraser(
-                    self.brush.size,
-                    self.previous_mouse_position,
-                    mouse_position,
-                );
-            }
-
-            if let Some(current_shape) = self.current_shape.as_mut() {
-                current_shape.update(
-                    mouse_position,
-                    self.brush.size,
-                    self.colour_wheel.current,
-                    painter,
-                );
-
-                match current_shape {
-                    Shape::Text(text_shape) if mouse_primary_pressed => {
-                        self.shapes.push(self.current_shape.take().unwrap());
-                    }
-                    Shape::Text(text_shape) if has_text_events => {
-                        let new_text =
-                            apply_text_events(&text_events, text_shape.text.clone(), &ctrl);
-
-                        if !new_text.is_empty() {
-                            text_shape.set_text(new_text);
-                        } else {
-                            self.current_shape.take();
-                        }
-                    }
-                    _ => {
-                        if mouse_primary_released {
-                            let shape = self.current_shape.take().unwrap();
-                            self.shapes.push(shape.clone());
-                            self.history.push(HistoryEvent::Add);
-                        }
-                    }
-                }
-            } else {
-                if mouse_primary_pressed {
-                    if ctrl {
-                        self.current_shape = Some(Shape::Arrow(Arrow {
-                            start: mouse_position,
-                            end: mouse_position,
-                            colour: self.colour_wheel.current,
-                            size: self.brush.size,
-                        }))
-                    } else if alt {
-                        self.current_shape = Some(Shape::Line(Line {
-                            start: mouse_position,
-                            end: mouse_position,
-                            colour: self.colour_wheel.current,
-                            size: self.brush.size,
-                        }))
-                    } else {
-                        self.current_shape = Some(Shape::Stroke(Stroke {
-                            points: vec![mouse_position],
-                            colour: self.colour_wheel.current,
-                            size: self.brush.size,
-                        }))
-                    }
-                } else if has_text_events {
-                    let new_text = apply_text_events(&text_events, String::new(), &ctrl);
-                    if !new_text.is_empty() {
-                        self.current_shape = Some(Shape::Text(Text::new(
-                            new_text,
-                            mouse_position,
-                            self.colour_wheel.current,
-                            self.brush.size,
-                            painter,
-                        )));
-                    }
-                }
-            }
-
-            if escape {
-                ui.send_viewport_cmd(ViewportCommand::Close);
-            }
-
-            if undo {
-                match self.history.pop() {
-                    Some(HistoryEvent::Add) | None => {
-                        self.shapes.pop();
-                    }
-                    Some(HistoryEvent::Remove(shape)) => {
-                        self.shapes.push(shape);
-                    }
-                }
-            }
-
-            self.previous_mouse_position = mouse_position;
         });
+    }
+
+    fn logic(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
+        let InteractionsInfo {
+            ctrl,
+            alt,
+            escape,
+            undo,
+            scroll,
+            f1,
+            mouse_position,
+            text_events,
+            has_text_events,
+            mouse_primary_pressed,
+            mouse_primary_released,
+            mouse_secondary_held,
+        } = extract_interactions_info(ctx);
+
+        self.previous_mouse_position = self.mouse_position;
+        self.mouse_position = mouse_position;
+
+        if f1 {
+            self.debug_mode = !self.debug_mode;
+        }
+
+        if scroll != 0.0 {
+            match ctrl {
+                false if scroll > 0.0 => self.colour_wheel.next(),
+                false if scroll < 0.0 => self.colour_wheel.prev(),
+                true if scroll > 0.0 => self.brush.enlarge(),
+                true if scroll < 0.0 => self.brush.shrink(),
+                _ => {}
+            }
+        }
+
+        if mouse_secondary_held {
+            self.handle_eraser(
+                self.brush.size,
+                self.previous_mouse_position,
+                self.mouse_position,
+            );
+        }
+
+        if let Some(current_shape) = self.current_shape.as_mut() {
+            current_shape.update(
+                self.mouse_position,
+                self.brush.size,
+                self.colour_wheel.current,
+                ctx,
+            );
+
+            match current_shape {
+                Shape::Text(text_shape) if mouse_primary_pressed => {
+                    self.shapes.push(self.current_shape.take().unwrap());
+                }
+                Shape::Text(text_shape) if has_text_events => {
+                    let new_text = apply_text_events(&text_events, text_shape.text.clone(), &ctrl);
+
+                    if !new_text.is_empty() {
+                        text_shape.set_text(new_text);
+                    } else {
+                        self.current_shape.take();
+                    }
+                }
+                _ => {
+                    if mouse_primary_released {
+                        let shape = self.current_shape.take().unwrap();
+                        self.shapes.push(shape.clone());
+                        self.history.push(HistoryEvent::Add);
+                    }
+                }
+            }
+        } else {
+            if mouse_primary_pressed {
+                if ctrl {
+                    self.current_shape = Some(Shape::Arrow(Arrow {
+                        start: mouse_position,
+                        end: mouse_position,
+                        colour: self.colour_wheel.current,
+                        size: self.brush.size,
+                    }))
+                } else if alt {
+                    self.current_shape = Some(Shape::Line(Line {
+                        start: mouse_position,
+                        end: mouse_position,
+                        colour: self.colour_wheel.current,
+                        size: self.brush.size,
+                    }))
+                } else {
+                    self.current_shape = Some(Shape::Stroke(Stroke {
+                        points: vec![mouse_position],
+                        colour: self.colour_wheel.current,
+                        size: self.brush.size,
+                    }))
+                }
+            } else if has_text_events {
+                let new_text = apply_text_events(&text_events, String::new(), &ctrl);
+                if !new_text.is_empty() {
+                    self.current_shape = Some(Shape::Text(Text::new(
+                        new_text,
+                        mouse_position,
+                        self.colour_wheel.current,
+                        self.brush.size,
+                        ctx,
+                    )));
+                }
+            }
+        }
+
+        if escape {
+            ctx.send_viewport_cmd(ViewportCommand::Close);
+        }
+
+        if undo {
+            match self.history.pop() {
+                Some(HistoryEvent::Add) | None => {
+                    self.shapes.pop();
+                }
+                Some(HistoryEvent::Remove(shape)) => {
+                    self.shapes.push(shape);
+                }
+            }
+        }
     }
 }
 
@@ -251,9 +255,8 @@ impl OverpaintApp {
     }
 }
 
-fn extract_interactions_info(ui: &Ui) -> InteractionsInfo {
-    ui.input(|i| {
-        let screen_rect = i.content_rect();
+fn extract_interactions_info(ctx: &Context) -> InteractionsInfo {
+    ctx.input(|i| {
         let ctrl = i.modifiers.ctrl;
         let alt = i.modifiers.alt;
         let escape = i.key_pressed(Key::Escape);
@@ -290,7 +293,6 @@ fn extract_interactions_info(ui: &Ui) -> InteractionsInfo {
         let mouse_secondary_held = i.pointer.secondary_down();
 
         InteractionsInfo {
-            screen_rect,
             ctrl,
             alt,
             escape,
@@ -332,7 +334,6 @@ fn apply_text_events(text_events: &[Event], mut current_text: String, ctrl: &boo
 }
 
 pub struct InteractionsInfo {
-    screen_rect: Rect,
     ctrl: bool,
     alt: bool,
     escape: bool,

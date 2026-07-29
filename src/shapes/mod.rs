@@ -1,4 +1,4 @@
-use eframe::egui::{Color32, Painter, Pos2, Rect};
+use eframe::egui::{Color32, Context, Painter, Pos2, Rect};
 
 use crate::{
     geometry::line_hits_rect,
@@ -28,12 +28,12 @@ impl Shape {
         }
     }
 
-    pub fn update(&mut self, pos: Pos2, size: f32, colour: Color32, painter: &Painter) {
+    pub fn update(&mut self, pos: Pos2, size: f32, colour: Color32, context: &Context) {
         match self {
             Shape::Stroke(stroke) => stroke.update(pos, size, colour),
             Shape::Arrow(arrow) => arrow.update(pos, size, colour),
             Shape::Line(line) => line.update(pos, size, colour),
-            Shape::Text(text) => text.update(pos, size, colour, painter),
+            Shape::Text(text) => text.update(pos, size, colour, context),
         }
     }
 

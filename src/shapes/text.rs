@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
-use eframe::egui::{Color32, CornerRadius, FontId, Galley, Painter, Pos2, Rect, Shape, vec2};
+use eframe::egui::{
+    Color32, Context, CornerRadius, FontId, Galley, Painter, Pos2, Rect, Shape, vec2,
+};
 
 use crate::geometry::line_hits_rect;
 
@@ -24,8 +26,8 @@ fn font_size(size: f32) -> f32 {
     8.0 + size * 1.5
 }
 
-fn galley(painter: &Painter, font_size: f32, text: &str, colour: Color32) -> Arc<Galley> {
-    painter
+fn galley(context: &Context, font_size: f32, text: &str, colour: Color32) -> Arc<Galley> {
+    context
         .fonts_mut(|f| f.layout_no_wrap(text.to_string(), FontId::proportional(font_size), colour))
 }
 
@@ -43,10 +45,10 @@ fn rect(pos: Pos2, galley: &Galley) -> Rect {
 }
 
 impl Text {
-    pub fn new(text: String, pos: Pos2, bg_colour: Color32, size: f32, painter: &Painter) -> Self {
+    pub fn new(text: String, pos: Pos2, bg_colour: Color32, size: f32, context: &Context) -> Self {
         let font_size = font_size(size);
         let colour = colour_on_bg(bg_colour);
-        let galley = galley(painter, font_size, &text, colour);
+        let galley = galley(context, font_size, &text, colour);
         let bounding_rect = rect(pos, &galley);
 
         Self {
@@ -62,7 +64,7 @@ impl Text {
         }
     }
 
-    pub fn update(&mut self, pos: Pos2, size: f32, colour: Color32, painter: &Painter) {
+    pub fn update(&mut self, pos: Pos2, size: f32, colour: Color32, context: &Context) {
         let galley_invalidated = self.galley_invalidated
             || self.bg_colour != colour
             || self.pos != pos
@@ -81,7 +83,7 @@ impl Text {
         }
 
         if galley_invalidated {
-            self.galley = galley(painter, self.font_size, &self.text, self.colour);
+            self.galley = galley(context, self.font_size, &self.text, self.colour);
             self.bounding_rect = rect(pos, &self.galley);
         }
     }
