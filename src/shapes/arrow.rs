@@ -63,4 +63,9 @@ impl Arrow {
             max: Pos2::new(self.start.x.max(self.end.x), self.start.y.max(self.end.y)),
         }
     }
+
+    pub fn translate(&mut self, translation: Vec2) {
+        self.start += translation;
+        self.end += translation;
+    }
 }

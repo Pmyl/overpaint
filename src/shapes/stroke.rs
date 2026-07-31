@@ -62,4 +62,10 @@ impl Stroke {
             max: Pos2::new(max_x + self.size / 2.0, max_y + self.size / 2.0),
         }
     }
+
+    pub fn translate(&mut self, translation: eframe::egui::Vec2) {
+        for point in &mut self.points {
+            *point = *point + translation;
+        }
+    }
 }

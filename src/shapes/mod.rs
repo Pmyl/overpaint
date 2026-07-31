@@ -37,6 +37,15 @@ impl Shape {
         }
     }
 
+    pub fn translate(&mut self, translation: eframe::egui::Vec2) {
+        match self {
+            Shape::Stroke(stroke) => stroke.translate(translation),
+            Shape::Arrow(arrow) => arrow.translate(translation),
+            Shape::Line(line) => line.translate(translation),
+            Shape::Text(text) => text.translate(translation),
+        }
+    }
+
     pub fn touches(&self, thickness: f32, start: Pos2, end: Pos2) -> bool {
         match self {
             Shape::Stroke(stroke) => stroke.touches(thickness, start, end),

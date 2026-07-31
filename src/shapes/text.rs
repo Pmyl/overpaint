@@ -110,6 +110,10 @@ impl Text {
         self.text = new_text;
         self.galley_invalidated = true;
     }
+
+    pub fn translate(&mut self, translation: eframe::egui::Vec2) {
+        self.bounding_rect = self.bounding_rect.translate(translation);
+    }
 }
 
 fn colour_on_bg(bg_colour: Color32) -> Color32 {
