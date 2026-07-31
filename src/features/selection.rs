@@ -7,6 +7,7 @@ use crate::shapes::Shape;
 pub struct RectSelection {
     pub is_selecting: bool,
     pub origin: Pos2,
+    pub anchor: Pos2,
     pub rect: Rect,
     pub shapes_indices: Vec<usize>,
 }
@@ -81,6 +82,7 @@ impl RectSelection {
     pub fn complete(&mut self, mouse_position: Pos2, shapes: &mut [Shape]) {
         self.update(mouse_position, shapes);
 
+        self.anchor = mouse_position;
         self.origin = mouse_position;
         self.rect = self.shapes_indices.iter().fold(
             Rect {
@@ -103,5 +105,12 @@ impl RectSelection {
         );
 
         self.is_selecting = false;
+    }
+
+    pub fn reset_shapes(&self, shapes: &mut [Shape]) {
+        let translation = self.anchor - self.origin;
+        self.shapes_indices
+            .iter()
+            .for_each(|&i| shapes[i].translate(translation));
     }
 }

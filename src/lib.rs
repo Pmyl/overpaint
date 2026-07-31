@@ -142,10 +142,6 @@ impl eframe::App for OverpaintApp {
             mouse_secondary_held,
         } = extract_interactions_info(ctx);
 
-        if escape {
-            ctx.send_viewport_cmd(ViewportCommand::Close);
-        }
-
         self.previous_mouse_position = self.mouse_position;
         self.mouse_position = mouse_position;
 
@@ -190,7 +186,10 @@ impl eframe::App for OverpaintApp {
                     self.shapes.push(shape);
                 }
                 Some(HistoryEvent::AddSelection) => {
-                    self.selection.take();
+                    self.selection
+                        .take()
+                        .unwrap()
+                        .reset_shapes(&mut self.shapes);
                 }
                 Some(HistoryEvent::RemoveSelection(selection)) => {
                     self.selection = Some(selection);
@@ -215,6 +214,13 @@ impl eframe::App for OverpaintApp {
                 self.history.push(HistoryEvent::RemoveSelection(selection));
                 return;
             }
+            Some(_) if escape => {
+                self.selection
+                    .take()
+                    .unwrap()
+                    .reset_shapes(&mut self.shapes);
+                return;
+            }
             Some(selection) => {
                 selection.update(self.mouse_position, &mut self.shapes);
                 return;
@@ -222,6 +228,7 @@ impl eframe::App for OverpaintApp {
             None if shift && mouse_primary_pressed => {
                 self.selection = Some(RectSelection {
                     is_selecting: true,
+                    anchor: self.mouse_position,
                     origin: self.mouse_position,
                     rect: Rect {
                         min: self.mouse_position,
@@ -248,6 +255,10 @@ impl eframe::App for OverpaintApp {
                     } else {
                         self.current_shape.take();
                     }
+                }
+                Shape::Text(_) if escape => {
+                    self.current_shape.take();
+                    return;
                 }
                 _ => {
                     if mouse_primary_released {
@@ -291,6 +302,10 @@ impl eframe::App for OverpaintApp {
                     )));
                 }
             }
+        }
+
+        if escape {
+            ctx.send_viewport_cmd(ViewportCommand::Close);
         }
     }
 }
