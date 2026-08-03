@@ -16,12 +16,14 @@ pub struct RectSelection {
     pub shapes_indices: Vec<usize>,
 }
 
+const BLINK_DURATION: usize = 15;
+
 impl RectSelection {
     pub fn draw(&self, painter: &Painter, shapes: &[Shape], app_counter: usize) {
         let stroke = egui::Stroke::new(1.0, egui::Color32::WHITE);
         let dash_length = 4.0;
         let gap_length = 2.0
-            + if !self.is_selecting && app_counter % 100 < 50 {
+            + if app_counter % (BLINK_DURATION * 2) < BLINK_DURATION {
                 2.0
             } else {
                 0.0
