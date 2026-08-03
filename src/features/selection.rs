@@ -6,7 +6,11 @@ use crate::shapes::Shape;
 
 pub struct RectSelection {
     pub is_selecting: bool,
+    // While selecting, the origin is the position where the selection started.
+    // After selecting, it is the position of the center of the selection.
     pub origin: Pos2,
+    // The position of the initial center of the selection, used to know
+    // how much the selection has moved to reposition the shapes.
     pub anchor: Pos2,
     pub rect: Rect,
     pub shapes_indices: Vec<usize>,
@@ -82,8 +86,6 @@ impl RectSelection {
     pub fn complete(&mut self, mouse_position: Pos2, shapes: &mut [Shape]) {
         self.update(mouse_position, shapes);
 
-        self.anchor = mouse_position;
-        self.origin = mouse_position;
         self.rect = self.shapes_indices.iter().fold(
             Rect {
                 min: Pos2::new(f32::MAX, f32::MAX),
@@ -103,6 +105,8 @@ impl RectSelection {
                 }
             },
         );
+        self.anchor = self.rect.center();
+        self.origin = self.rect.center();
 
         self.is_selecting = false;
     }

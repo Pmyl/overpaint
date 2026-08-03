@@ -73,6 +73,9 @@ impl eframe::App for OverpaintApp {
 
             if let Some(current_shape) = &self.current_shape {
                 current_shape.draw(painter);
+            } else if let Some(selection) = &self.selection {
+                selection.draw(painter, &self.shapes, self.app_counter);
+                ui.request_repaint();
             } else {
                 painter.circle(
                     self.mouse_position,
@@ -81,11 +84,6 @@ impl eframe::App for OverpaintApp {
                     EguiStroke::NONE,
                 );
             }
-
-            self.selection.as_ref().inspect(|s| {
-                s.draw(painter, &self.shapes, self.app_counter);
-                ui.request_repaint();
-            });
 
             if self.debug_mode {
                 painter.text(
