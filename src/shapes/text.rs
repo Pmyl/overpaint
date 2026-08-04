@@ -113,6 +113,7 @@ impl Text {
 
     pub fn translate(&mut self, translation: eframe::egui::Vec2) {
         self.bounding_rect = self.bounding_rect.translate(translation);
+        self.pos += translation;
     }
 }
 
